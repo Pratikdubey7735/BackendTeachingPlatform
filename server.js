@@ -32,14 +32,42 @@ app.get('/api/pgn-files', async (req, res) => {
 
   try {
     const { resources } = await cloudinary.search
-      .expression(`folder: ${level} AND format:pgn`) // Use the level as the folder name
-      .sort_by('created_at', 'desc') // Optional: Sort by creation date
+      .expression(`folder:${level} AND format:pgn`) // Use the level as the folder name
       .execute();
 
-    const pgnFiles = resources.map((file) => ({
-      url: file.secure_url,
-      filename: file.public_id,
-    }));
+    // Separate files into those that start with a number and those that start with a letter/other
+    const numberFiles = [];
+    const letterFiles = [];
+
+    resources.forEach((file) => {
+      const filename = file.public_id;
+
+      // Check if the filename starts with a number
+      if (/^\d/.test(filename)) {
+        numberFiles.push({
+          url: file.secure_url,
+          filename: file.public_id,
+        });
+      } else {
+        letterFiles.push({
+          url: file.secure_url,
+          filename: file.public_id,
+        });
+      }
+    });
+
+    // Sort number files numerically (based on the number at the start of the filename)
+    numberFiles.sort((a, b) => {
+      const numA = parseInt(a.filename.match(/^\d+/), 10); // Extract number from the beginning of the filename
+      const numB = parseInt(b.filename.match(/^\d+/), 10); // Extract number from the beginning of the filename
+      return numA - numB; // Sort numerically
+    });
+
+    // Sort letter files alphabetically by filename
+    letterFiles.sort((a, b) => a.filename.localeCompare(b.filename)); // Alphabetical sort for letter files
+
+    // Combine the two sorted arrays, number files first
+    const pgnFiles = [...numberFiles, ...letterFiles];
 
     res.json(pgnFiles);
   } catch (error) {
